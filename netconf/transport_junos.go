@@ -6,6 +6,7 @@ package netconf
 
 import (
 	"os/exec"
+	"syscall"
 )
 
 // TransportJunos maintains the information necessary to communicate with Junos
@@ -19,6 +20,13 @@ type TransportJunos struct {
 func (t *TransportJunos) Close() error {
 	if t.cmd != nil {
 		t.ReadWriteCloser.Close()
+		if err := t.cmd.Process.Kill(); err != nil {
+			return err
+		}
+
+		if err := t.cmd.Wait(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -28,6 +36,10 @@ func (t *TransportJunos) Open() error {
 	var err error
 
 	t.cmd = exec.Command("xml-mode", "netconf", "need-trailer")
+
+	t.cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGTERM,
+	}
 
 	w, err := t.cmd.StdinPipe()
 	if err != nil {
